@@ -1,0 +1,58 @@
+---
+title: "Animal Crossing"
+author: "Konstantinos Patelis"
+date: "4/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_libraries, include=FALSE}
+
+library(tidyverse)
+
+```
+
+
+
+```{r read_data, warning=FALSE, echo=FALSE, include=FALSE}
+
+critic <- readr::read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/critic.tsv')
+user_reviews <- readr::read_tsv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/user_reviews.tsv')
+items <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/items.csv')
+villagers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/villagers.csv')
+
+```
+
+
+# Most valuable items
+
+```{r}
+
+items %>% 
+  filter(!is.na(sell_currency), 
+         buy_currency == "bells") %>% 
+  mutate(cranny_profit = buy_value/sell_value) %>% 
+  arrange(desc(cranny_profit)) %>% 
+  View()
+
+items %>% 
+  filter(!is.na(sell_currency), 
+         buy_currency == "bells") %>% 
+  group_by(category) %>% 
+  summarise(avg_value = mean(buy_value)) %>% 
+  arrange(desc(avg_value))
+  
+items %>% 
+  filter(!is.na(sell_currency), 
+         buy_currency == "bells") %>% 
+  filter(category == "Bugs") %>% 
+  group_by(name) %>% 
+  summarise(avg_value = mean(buy_value)) %>% 
+  arrange(desc(avg_value))
+
+  
+```
+
