@@ -4,12 +4,19 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
-```{r load_libraries, include=FALSE}
+# knitr options
+
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries
 
 library(tidyverse)
+library(ggrepel)
+library(gganimate)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
 
 ```
 
@@ -21,4 +28,84 @@ events <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tid
 tree_rings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-12/tree_rings.csv')
 sulfur <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-12/sulfur.csv')
 
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Tectonic plate boundary data retrieved from https://github.com/fraxen/tectonicplates
+# Thanks to Hugo Ahlenius, Nordpil and Peter Bird for providing the data
+
+boundaries <- st_read(dsn = glue("{here::here()}/ComplementaryDatasets/PB2002_plates.json"), drivers = "GeoJSON")
+
 ```
+
+## World Map of Eruptions
+
+```{r}
+
+# Filter to keep only the AD years
+# Impute missing VEI values using a floored median based on other eruptions of the same volcano, or other eruptions in that region
+
+eruptions_ad <- eruptions %>% 
+  filter(start_year > 0) %>%
+  group_by(volcano_number) %>% 
+  mutate(vei = if_else(is.na(vei), floor(median(vei, na.rm = TRUE)), vei)) %>% 
+  ungroup() %>% 
+  left_join(volcano %>% 
+              select(volcano_number, 
+                     country, 
+                     region, 
+                     primary_volcano_type), 
+            by = "volcano_number"
+            ) %>% 
+  group_by(region) %>% 
+  mutate(vei = if_else(is.na(vei), floor(median(vei, na.rm = TRUE)), vei)) %>% 
+  ungroup() %>% 
+  mutate(start_decade = floor(start_year/10) * 10,
+         start_century = floor(start_year/100) * 100,
+         vei = factor(vei))
+
+CPCOLS <- c("#1C86EE", "#CD950C", "#333333")
+scales <- c("#FFBA08", "#FAA307", "#F48C06", "#E85D04", "#E24603", "#DC2F02", "#D00000", "#9D0208", "#6A040F")
+
+animation <- ggplot(data = eruptions_ad) +
+  geom_sf(data = world, colour = CPCOLS[2], fill = CPCOLS[2]) + 
+  geom_sf(data = boundaries, colour = CPCOLS[1], fill = NA, size = 1) + 
+  geom_point(aes(x = longitude, y = latitude, fill = vei, colour = vei, size = vei, group = factor(start_century)), shape = 21, alpha = 0.5) + 
+  theme_minimal() + 
+  scale_colour_manual(values = scales) + 
+  scale_fill_manual(values = scales) + 
+  labs(title = "Volcano eruptions across the centuries",
+       caption = "Missing VEI were imputed using a floored median of a) the volcano, b) the region of the volcano", 
+       colour = "VEI", 
+       fill = "VEI", 
+       size = "VEI", 
+       alpha = "VEI") + 
+  theme(plot.background = element_rect(colour = CPCOLS[3], fill = CPCOLS[3]), 
+        axis.ticks = element_line(linetype = "blank"), 
+        panel.grid.major = element_line(linetype = "blank", colour = NA), 
+        axis.text = element_text(colour = NA), 
+        plot.title = element_text(size = 15, family = "Dubai", face = "italic", colour = "beige", hjust = 0.5, vjust = 0), 
+        panel.background = element_rect(fill = NA, colour = NA), 
+        plot.subtitle = element_text(size = 10, colour = "beige", hjust = 0.5), 
+        plot.caption = element_text(size = 9, face = "italic", colour = "beige"), 
+        axis.title = element_text(colour = NA),
+        legend.text = element_text(size = 8, colour = "beige"), 
+        legend.title = element_text(colour = "beige"), 
+        legend.key = element_rect(fill = NA, colour = NA), 
+        legend.background = element_rect(fill = NA, colour = NA), 
+        panel.grid.minor = element_line(colour = NA, linetype = "blank")
+        ) + 
+  transition_manual(frames = start_century, cumulative = FALSE) + 
+  labs(subtitle = "{current_frame}s")
+
+animate(plot = animation, 
+        nframes = length(unique(eruptions_ad$start_century)), 
+        fps = 2, end_pause = 0, height = 350, width = 625)
+
+```
+
+```{r}
+
+anim_save(filename = "VolcanicEruptions.gif", animation = last_animation(), path = glue("{here::here()}/Plots"))
+
+```
+

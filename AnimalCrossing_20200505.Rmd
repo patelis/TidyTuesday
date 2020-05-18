@@ -12,6 +12,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r load_libraries, include=FALSE}
 
 library(tidyverse)
+library(scales)
+library(gt)
+library(tidytext)
+library(lubridate)
+library(DescTools)
+library(hrbrthemes)
+library(magick)
+library(tvthemes)
 
 ```
 
@@ -26,6 +34,128 @@ villagers <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/
 
 ```
 
+
+# My Villagers
+
+```{r}
+
+villagers %>% 
+  filter(name %in% c("Shari", "Astrid", "Pierce", "Benedict", "Biff", "	Biskit", ""))
+
+```
+
+
+# Extract main colours
+
+What are the most common colour palettes for AC villagers
+
+```{r}
+
+
+village <- villagers %>%
+  mutate(image_cols = map(url, create_palette, n = 10)) %>% 
+  unnest(image_cols) 
+
+village %>% 
+  group_by(image_cols) %>% 
+  count(sort = TRUE) %>% 
+  ungroup() %>% 
+  # select(image_cols) %>% 
+  head(20) 
+
+  
+
+
+
+```
+
+# Personality Disposition by Zodiac
+
+```{r}
+
+villagers %>% 
+  mutate(birthday = as.Date(birthday, format = "%m-%d"), 
+         zodiac = Zodiac(birthday)) %>% 
+  group_by(zodiac, personality) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%
+  ggplot(aes(x = personality, y = count, fill = zodiac)) +  
+  geom_col(position = "dodge") + 
+  theme_ft_rc() + 
+  scale_fill_gravityFalls() + 
+  labs(
+    title = "Which Zodiac is the most lazy in ACNH?",
+    x = "Personality", 
+    y = NULL,
+    fill = NULL
+  )
+
+```
+
+
+# Most lazy Zodiac
+
+```{r}
+
+zodiac_villager <- villagers %>% 
+  filter(personality == "lazy") %>% 
+  mutate(birthday = as.Date(birthday, format = "%m-%d"), 
+         zodiac = Zodiac(birthday), 
+         image = map(url, image_read))
+  
+
+villagers %>% 
+  # filter(personality == "lazy") %>% 
+  mutate(birthday = as.Date(birthday, format = "%m-%d"), 
+         zodiac = Zodiac(birthday)) %>% 
+  group_by(zodiac, personality) %>%
+  summarise(count = n()) %>%
+  ungroup() %>%
+  mutate(zodiac = reorder_within(zodiac, count, personality)) %>% 
+  ggplot(aes(x = count, y = zodiac)) +  
+  geom_col() + 
+  scale_y_reordered() + 
+  scale_x_continuous(labels = scales::number_format(accuracy = 1)) +
+  facet_wrap(facets = "personality", scales = "free_y") + 
+  theme_ft_rc() +
+  # scale_fill_gravityFalls() + 
+  labs(
+    title = "Personality Disposition of different Zodiac Signs according to ACNH",
+    x = NULL, 
+    y = "Zodiac Sign",
+    fill = NULL
+  ) + 
+  theme(
+    axis.title.y.left = element_text(size = 15, vjust = 0, hjust = 0.5)
+  )
+
+
+```
+
+
+# Personality Disposition by Animal type
+
+```{r}
+
+villagers %>% 
+  filter(personality == "lazy") %>% 
+  group_by(species, personality) %>%
+  summarise(count = n()) %>%
+  ungroup() %>% 
+  mutate(species = fct_lump_min(species, min = 2, w = count), 
+         species = fct_reorder(species, count, .desc = FALSE)) %>% 
+  ggplot(aes(x = count, y = species)) +  
+  geom_col(position = "dodge", fill = gravityFalls_pal()(1)[[1]]) + 
+  theme_ft_rc() + 
+  scale_fill_gravityFalls() +
+  labs(
+    title = "Which species is the most lazy in ACNH?",
+    x = "Personality", 
+    y = NULL,
+    fill = NULL
+  )
+
+```
 
 # Most valuable items
 
